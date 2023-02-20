@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+set -e
+
+images="images.txt"
+repository="192.168.10.10:12345/kubernetes"
+
+repo() {
+  if [[ ! -f "images.bak.txt" ]]; then
+    cat >> "images.bak.txt" << EOF
+$1
+EOF
+  return
+  fi
+
+  if [[ -z `cat "images.bak.txt" | grep $1` ]]; then
+    cat >> "images.bak.txt" << EOF
+$1
+EOF
+  fi
+}
+
+main() {
+  cat $images | while read image; do
+    if [[ ! $image == \#* ]]; then
+      echo -e "\033[32mdocker pull $image ...\033[0m"
+
+      local tag=${image##*:}
+      local image=${image%:*}
+      local private=$repository/${image##*/}
+      
+      if [[ $(docker images | grep "$image" | grep "$tag") ]]; then
+        continue
+      fi
+
+      if [[ $(docker images | grep "$private" | grep "$tag") ]]; then
+        continue
+      fi
+
+      # docker pull
+      docker pull $image:$tag
+
+      # docker tag
+      docker tag $image:$tag $private:$tag
+
+      repo "$private:$tag"
+    fi
+  done
+}
+
+# image 提取并去重
+if [[ $1 ]]; then
+  cat $1 | grep "image:" | sort | uniq | sed -s 's/.*image: //g' > images.txt
+fi
+
+main
+
+# docker-push
+read -sp "镜像推送(Y/N): " isPush
+if [[ $isPush =~ ^[yY]+$ ]]; then
+  cat "images.bak.txt" |  while read image; do
+    docker push $image
+  done
+fi
+
+# docker-clean
+read -sp "镜像清理(Y/N): " isClean
+if [[ $isClean =~ ^[yY]+$ ]]; then
+  cat $images |  while read image; do
+    if [[ ! $image == \#* ]]; then
+      docker push $image
+    fi
+  done
+fi
