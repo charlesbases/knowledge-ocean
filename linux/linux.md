@@ -530,6 +530,21 @@ free -m
     # 按 ASCII 倒叙
     echo "a c b" | tr ' ' '\n' | sort -r
     ```
+    
+  - ###### uniq
+
+    ```shell
+    # uniq 只能去除相邻字符串的重复，所以需要先使用 `sort` 进行排序
+    
+    demo="""
+    a
+    b
+    a
+    b
+    """
+    
+    cat $demo | sort | uniq
+    ```
 
 - ##### sed
 
