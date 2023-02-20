@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  nsqlookupd:
+    image: nsqio/nsq
+    container_name: nsq_nsqlookupd
+    hostname: nsqlookupd
+    command: /nsqlookupd
+    tty: true
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${NSQLOOKUPD_TCP:-4160}:4160"
+      - "${NSQLOOKUPD_HTTP:-4161}:4161"
+
+  nsqd:
+    image: nsqio/nsq
+    container_name: nsq_nsqd
+    hostname: nsqd
+    command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
+    tty: true
+    environment:
+      TZ: Asia/Shanghai
+    depends_on:
+      - nsqlookupd
+    ports:
+      - "${NSQD_TCP:-4150}:4150"
+      - "${NSQD_HTTP:-4151}:4151"
+
+  nsqadmin:
+    image: nsqio/nsq
+    container_name: nsq_nsqadmin
+    hostname: nsqadmin
+    command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
+    tty: true
+    environment:
+      TZ: Asia/Shanghai
+    depends_on:
+      - nsqlookupd
+    ports:
+      - "${NSQADMIN_TCP:-4171}:4171"
+
+networks:
+  default:
+    name: local

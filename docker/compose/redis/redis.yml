@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:latest
+    container_name: redis
+    hostname: redis
+    restart: always
+    user: root
+    privileged: true
+    command: redis-server --appendonly yes
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - /opt/volumes/redis/data:/data
+      - /opt/volumes/redis/logs:/logs
+      - /opt/volumes/redis/redis.conf:/usr/local/etc/redis/redis.conf
+
+networks:
+  default:
+    name: local

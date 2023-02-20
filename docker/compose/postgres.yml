@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  postgres:
+    image: bitnami/postgresql:14.4.0
+    container_name: postgres
+    hostname: postgres
+    restart: always
+    user: root
+    privileged: true
+    environment:
+      TZ: Asia/Shanghai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DATABASE: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - /opt/volumes/postgres/data:/bitnami/postgresql/data
+
+networks:
+  default:
+    name: local

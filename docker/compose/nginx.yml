@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    hostname: nginx
+    restart: always
+    user: root
+    privileged: true
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - /opt/volumes/nginx/conf:/etc/nginx/conf.d
+#      - /opt/volumes/nginx/nginx.pid:/var/run/nginx.pid
+      - /opt/volumes/nginx/logs:/var/log/nginx
+#    ports:
+
+networks:
+  default:
+    name: local

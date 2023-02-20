@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  nats:
+    image: bitnami/nats:2.9.6
+    container_name: nats
+    hostname: nats
+    restart: always
+    user: root
+    privileged: true
+    entrypoint: /nats-server
+    command: --js --sd /data
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "${NATS_CLIENT_PORT:-4222}:4222"
+      - "${NATS_CLUSTER_PORT:-6222}:6222"
+      - "${NATS_HTTP_PORT:-8222}:8222"
+    volumes:
+      - /opt/volumes/nats:/data
+
+networks:
+  default:
+    name: local
