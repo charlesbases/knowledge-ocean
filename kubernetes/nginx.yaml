@@ -1,0 +1,103 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: proxy
+  namespace: default
+  labels:
+    app: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      volumes:
+        - name: proxy-configmap
+          configMap:
+            name: proxy
+            defaultMode: 420
+      containers:
+        - name: proxy
+          image: "nginx:alpine"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: proxy-configmap
+              mountPath: /etc/nginx/conf.d/
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: proxy
+  namespace: default
+data:
+  nginx.conf: |
+    server {
+      listen       8080;
+      server_name localhost;
+    
+      location / {
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_pass http://192.168.1.1:8080;
+      }
+    
+      gzip on;
+      gzip_min_length  5k;
+      gzip_buffers     4 16k;
+      gzip_comp_level 3;
+      gzip_types       text/plain application/javascript text/css application/xml text/javascript application/x-httpd-php image/jpeg image/gif image/png;
+      gzip_vary on;
+    }
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: proxy
+  namespace: default
+  labels:
+    app: proxy
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: proxy
+  type: ClusterIP
+
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: proxy
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.demo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: proxy
+                port:
+                  number: 8080
