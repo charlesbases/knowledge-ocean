@@ -6,63 +6,91 @@
 
 ## 1. 安装
 
-### 1. 依赖安装
+### 1. 环境准备
 
-```shell
-# 关闭防火墙
-systemctl stop firewalld && systemctl disable firewalld
-apt remove firewalld --purge -y
+- ##### firewalld
 
-# 禁用 swap
-# 临时
-swapoff -a
-# 永久
-sed -ri 's/.*swap.*/#&/' /etc/fstab
+  ```shell
+  # 关闭防火墙
+  sudo sh -c "systemctl stop firewalld && systemctl disable firewalld"
+  sudo apt remove firewalld --purge -y
+  ```
 
-# 修改 hostname
-hostnamectl set-hostname xxxx
+- ##### swap
 
-# 添加 hosts
-cat >> /etc/hosts << EOF
-192.168.1.10 kube-master
-192.168.1.11 kube-node-1
-192.168.1.12 kube-node-2
-192.168.1.13 kube-node-3
-EOF
+  ```shell
+  # 临时
+  swapoff -a
+  # 永久
+  sed -ri 's/.*swap.*/#&/' /etc/fstab
+  ```
 
-# 开启内核模块(ipvs)
-cat > /etc/modules-load.d/k8s.conf << EOF
-overlay
-br_netfilter
-ip_vs
-ip_vs_sh
-ip_vs_rr
-ip_vs_wrr
-nf_conntrack
-EOF
+- ##### hostname
 
-# 调整内核参数
-cat > /etc/sysctl.d/k8s.conf << EOF
-net.ipv4.ip_forward = 1
-net.bridge.bridge-nf-call-iptables = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-vm.swappiness = 0
-vm.panic_on_oom = 0
-fs.inotify.max_user_instances = 8192
-fs.inotify.max_user_watches = 1048576
-fs.file-max = 52706963
-fs.nr_open = 52706963
-net.ipv6.conf.all.disable_ipv6 = 1
-net.netfilter.nf_conntrack_max = 2310720
-EOF
-sysctl --system
+  ```shell
+  # 修改 hostname
+  hostnamectl set-hostname xxxx
+  
+  # 添加 hosts
+  cat >> /etc/hosts << EOF
+  192.168.1.10 kube-master
+  192.168.1.11 kube-node-1
+  192.168.1.12 kube-node-2
+  192.168.1.13 kube-node-3
+  EOF
+  ```
 
-# 时间同步
-## netdate 系统时间
-sudo sh -c "apt install ntp -y && ntpd time.windows.com && timedatectl set-timezone 'Asia/Shanghai'"
-## hwclock 硬件时间
-sudo hwclock -w
-```
+- ##### selinux
+
+  ```shell
+  # 临时关闭
+  setenforce 0
+  
+  # 永久关闭
+  sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config 
+  ```
+
+- ##### ipvs
+
+  ```shell
+  # 开启内核模块(ipvs)
+  cat > /etc/modules-load.d/k8s.conf << EOF
+  overlay
+  br_netfilter
+  ip_vs
+  ip_vs_sh
+  ip_vs_rr
+  ip_vs_wrr
+  nf_conntrack
+  EOF
+  
+  # 调整内核参数
+  cat > /etc/sysctl.d/k8s.conf << EOF
+  net.ipv4.ip_forward = 1
+  net.bridge.bridge-nf-call-iptables = 1
+  net.bridge.bridge-nf-call-ip6tables = 1
+  vm.swappiness = 0
+  vm.panic_on_oom = 0
+  fs.inotify.max_user_instances = 8192
+  fs.inotify.max_user_watches = 1048576
+  fs.file-max = 52706963
+  fs.nr_open = 52706963
+  net.ipv6.conf.all.disable_ipv6 = 1
+  net.netfilter.nf_conntrack_max = 2310720
+  EOF
+  
+  sysctl --system
+  ```
+
+- ##### timezone
+
+  ```shell
+  # 时间同步
+  ## netdate 系统时间
+  sudo sh -c "apt install ntp -y && ntpd time.windows.com && timedatectl set-timezone 'Asia/Shanghai'"
+  ## hwclock 硬件时间
+  sudo hwclock -w
+  ```
 
 ### 2. 组件安装
 
@@ -85,17 +113,16 @@ sudo hwclock -w
   sudo apt update && sudo apt reinstall kubeadm=1.24.00-00 kubelet=1.24.00-00 kubectl=1.24.00-00 -y
   
   # 开机启动
-  sudo systemctl enable kubelet.service
-  sudo systemctl start kubelet.service
+  sudo sh -c "systemctl enable kubelet.service && systemctl start kubelet.service"
   
   # oh-my-zsh plugins
-  ···
+  ...
   autoload -Uz compinit
   compinit
   
   plugins=(git kubectl)
   source <(kubectl completion zsh)
-  ···
+  ...
   
   ```
   
@@ -104,6 +131,28 @@ sudo hwclock -w
   ```shell
   
   ```
+  
+- ##### rpm
+
+  ```shell
+  # http://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/Packages/
+  
+  # kubeadm-1.23.16-0.x86_64.rpm
+  # kubelet-1.23.16-0.x86_64.rpm
+  # kubectl-1.23.16-0.x86_64.rpm
+  # cri-tools-1.26.0-0.x86_64.rpm
+  # kubernetes-cni-1.2.0-0.x86_64.rpm
+  
+  # 安装 rpm 包
+  rpm -ivh *.rpm --nodeps --force
+  
+  # 安装依赖
+  sudo apt install -y socat conntrack
+  
+  # 开机启动
+  sudo sh -c "systemctl enable kubelet.service && systemctl start kubelet.service"
+  ```
+
 
 ### 3. 服务启动
 
@@ -114,15 +163,27 @@ sudo hwclock -w
   kubeadm config images list
   
   # kubeadm init (k8s.gcr.io)
-  # kubeadm init --apiserver-advertise-address=192.168.1.10 --kubernetes-version v1.23.9 --service-cidr=10.96.0.0/12  --pod-network-cidr=192.168.0.0/16
+  # kubeadm init --apiserver-advertise-address 192.168.1.10 --kubernetes-version v1.23.9 --service-cidr=10.96.0.0/12  --pod-network-cidr=192.168.0.0/16
   
   # kubeadm init (aliyuncs)
-  kubeadm init --apiserver-advertise-address=192.168.1.10 --image-repository registry.aliyuncs.com/google_containers --kubernetes-version v1.23.9 --service-cidr=10.96.0.0/12  --pod-network-cidr=192.168.0.0/16
+  ip=192.168.1.10
+  version=1.23.9
+  repository=repository.aliyuncs.com/google_containers
+  sudo kubeadm init --apiserver-advertise-address $ip --image-repository $repository --kubernetes-version $version --service-cidr=10.96.0.0/12  --pod-network-cidr=192.168.0.0/16
   
   # 创建 master 账户
   rm -rf $HOME/.kube && mkdir -p $HOME/.kube
   sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
   sudo chown $(id -u):$(id -g) $HOME/.kube/config
+  
+  # 安装网络插件
+  kubectl apply -f cni-calico.yaml
+  
+  # 修改 "--bind-address"
+  ## kube-scheduler
+  sudo sh -c "sed -s -i 's/--bind-address=127.0.0.1/--bind-address=0.0.0.0/g' /etc/kubernetes/manifests/kube-scheduler.yaml"
+  ## kube-controller-manager
+  sudo sh -c "sed -s -i 's/--bind-address=127.0.0.1/--bind-address=0.0.0.0/g' /etc/kubernetes/manifests/kube-controller-manager.yaml"
   
   # token
   kubeadm token create --print-join-command
@@ -152,6 +213,9 @@ sudo hwclock -w
   docker pull docker.io/calico/cni:v3.23.2
   docker pull docker.io/calico/node:v3.23.2
   docker pull docker.io/calico/kube-controllers:v3.23.2
+  
+  # 修改 calico 网卡发现机制
+  sed -s -i 's/- name: CLUSTER_TYPE/- name: IP_AUTODETECTION_METHOD\n              value: "interface=ens.*"\n            - name: CLUSTER_TYPE"/g' calico.yaml
   
   # 部署 CNI 网络插件
   kubectl apply -f cni-calico.yaml
@@ -187,83 +251,205 @@ sudo hwclock -w
 # 节点重置
 
 ## master
-sudo kubeadm reset
-sudo rm -rf $HOME/.kube /etc/cni/net.d/ /var/lib/cni/calico
+sudo sh -c "kubeadm reset && rm -rf $HOME/.kube /etc/cni/net.d/ /var/lib/cni/calico"
 
 ## node
-sudo kubeadm reset
-sudo rm -rf /etc/cni/net.d/ /var/lib/cni/calico
+sudo sh -c "kubeadm reset && rm -rf /etc/cni/net.d/ /var/lib/cni/calico"
 ```
 
-- ##### [ERROR CRI]
+#### 5.1 [ERROR CRI]
+
+```shell
+rm -rf /etc/containerd/config.toml && systemctl restart containerd
+```
+
+#### 5.2 [ERROR Swap]
+
+```shell
+# 未关闭虚拟内存
+# 临时关闭
+swapoff -a
+# 永久关闭
+sed -ri 's/.*swap.*/#&/' /etc/fstab
+```
+
+#### 5.3 [ERROR NumCPU]
+
+```shell
+# 错误的 CPU 核心数。最少为 2.
+```
+
+#### 5.4 [ERROR Port-10250]
+
+```shell
+# 端口被占用
+kubeadm reset -f && rm -rf $HOME/.kube
+```
+
+#### 5.5 timed out
+
+```shell
+# 下载基础镜像
+docker pull k8s.gcr.io/...
+
+# 重启 docker
+systemctl restart docker
+
+# 重启 kubelet
+systemctl stop kubelet
+```
+
+#### 5.6 connection refused
+
+```shell
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+#### 5.7 kubelet is not running
+
+```shell
+
+```
+
+#### 5.8 BIRD is not ready
+
+```shell
+# 调整 calico 网络插件的网卡发现机制
+```
+
+```shell
+sed -s -i 's/- name: CLUSTER_TYPE/- name: IP_AUTODETECTION_METHOD\n              value: "interface=ens.*"\n            - name: CLUSTER_TYPE"/g' calico.yaml
+```
+
+```shell
+kubectl edit daemonsets -n kube-system calico-node
+
+...
+          env:
+            - name: IP_AUTODETECTION_METHOD
+              value: "interface=ens.*"
+            - name: CLUSTER_TYPE"
+              value: "k8s,bgp"
+...
+```
+
+#### 5.9 coredns ContainerCreating
+
+```shell
+# 查看 cni 版本是否与 kubernetes 版本兼容
+
+# coredns 未就绪与 cni 插件有必然联系
+kubectl describe pods -n kube-system  calico-
+
+# 删除节点上 cni 安装信息
+sudo rm -rf /etc/cni/net.d/* /var/lib/cni/calico
+
+# 重启 kubelet
+sudo systemctl restart kubelet
+```
+
+#### 5.10 disk-pressure:NoSchedule
+
+```shell
+# 磁盘空间不足
+```
+
+- ###### docker
 
   ```shell
-  rm -rf /etc/containerd/config.toml && systemctl restart containerd
-  ```
-
-- ##### [ERROR Swap]
-
-  ```shell
-  # 未关闭虚拟内存
-  # 临时关闭
-  swapoff -a
-  # 永久关闭
-  sed -ri 's/.*swap.*/#&/' /etc/fstab
-  ```
-
-- ##### [ERROR NumCPU]
-
-  ```shell
-  # 错误的 CPU 核心数。最少为 2.
-  ```
-
-- ##### [ERROR Port-10250]
-
-  ```shell
-  # 端口被占用
-  kubeadm reset -f && rm -rf $HOME/.kube
-  ```
-
-- ##### timed out
-
-  ```shell
-  # 下载基础镜像
-  docker pull k8s.gcr.io/...
-
+  # 查看 docker 状态，定位存储配置文件位置
+  sudo systemctl status -l docker
+  ...
+  ● docker.service - Docker Application Container Engine
+     Loaded: loaded (/etc/systemd/system/docker.service; enabled; vendor preset: disabled)
+     Active: active (running) since Fri 2022-12-16 10:52:48 CST; 2 months 7 days ago
+       Docs: https://docs.docker.com
+  ...
+  
+  # 修改数据存储目录
+  sudo vim /etc/systemd/system/docker.service
+  ...
+  ExecStart=/usr/bin/dockerd --graph /mnt/docker
+  ...
+  
   # 重启 docker
-  systemctl restart docker
-
-  # 重启 kubelet
-  systemctl stop kubelet
+  sudo systemctl restart docker
   ```
 
-- ##### connection refused
+- ###### kubelet
 
   ```shell
-  mkdir -p $HOME/.kube
-  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+  # 查看 kubelet 状态
+  sudo systemctl status -l kubelet
+  ...
+  ● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/usr/lib/systemd/system/kubelet.service; enabled; vendor preset: disabled)
+    Drop-In: /usr/lib/systemd/system/kubelet.service.d
+             └─10-kubeadm.conf
+     Active: active (running) since Wed 2023-02-22 10:15:58 CST; 30min ago
+       Docs: https://kubernetes.io/docs/
+  ...
+  
+  # 查看 kubelet 服务配置
+  cat /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf | grep EnvironmentFile
+  ...
+  # kubeadm init 和 kubeadm join 运行时生成的文件
+  EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+  # 管理自定义参数的配置文件
+  EnvironmentFile=-/etc/sysconfig/kubelet
+  ...
+  
+  # 修改配置文件
+  sudo vim /etc/sysconfig/kubelet
+  ...
+  KUBELET_EXTRA_ARGS=
+  
+  # --root-dir=/mnt/kubelet                => kubelet 数据存储目录
+  # --eviction-hard=nodefs.available<5%    => 在 kubelet 相关存储不足 5% 时，开始驱逐 Pod
+  # --eviction-hard=nodefs.available<10Gi  => 在 kubelet 相关存储不足 10G 时，开始驱逐 Pod
+  # --eviction-hard=imagefs.available<5%   => 在容器运行时，相关存储不足 5% 时，开始驱逐 Pod
+  ...
+  
+  # 重启 daemon-reload 与 kubelet
+  sudo sh -c "systemctl daemon-reload && systemctl restart kubelet"
   ```
 
-- ##### kubelet is not running
+- ###### log
 
   ```shell
-  
+  # 清理相关日志
+  # /var/log
   ```
-  
-- ##### coredns ContainerCreating
+
+#### 5.11 namespace Terminating
+
+- ##### 强制删除
 
   ```shell
-  # 查看 cni 版本是否与 kubernetes 版本兼容
+  name=target
+  kubectl delete ns $name --force --grace-period 0
+  ```
+
+- ##### 接口删除
+
+  ```shell
+  name=target
+  kubectl get ns $name -o json > $name.json
   
-  # coredns 未就绪与 cni 插件有必然联系
-  kubectl describe pods -n kube-system  calico-
+  # 删除 spec 与 status
+  vim $name.json
+  ...
   
-  # 删除节点上 cni 安装信息
-  sudo rm -rf /etc/cni/net.d/* /var/lib/cni/calico
+  # 启动代理(需使用 nohup 后台运行，或者开启另一个 session)
+  kubectl proxy
   
-  # 重启 kubelet
-  sudo systemctl restart kubelet
+  # 调用接口删除 namespace
+  curl -k -H "Content-Type: application/json" -X PUT --data-binary @$name.json http://localhost:8001/api/v1/namespaces/$name/finalize
+  
+  # 关闭代理
+  # kill -9 或 close session
   ```
 
 --------
@@ -1285,8 +1471,12 @@ spec:
     name: nginx
     namespace: default
     annotations:
-      kubernetes.io/ingress.class: "nginx"
+      # kubernetes.io/ingress.class: "nginx"                  # 等同于 ingressClassName: nginx
       nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: 1M         # default: 1M
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: '30' # 秒
+      nginx.ingress.kubernetes.io/proxy-read-timeout: '30'    # 秒
+      nginx.ingress.kubernetes.io/proxy-send-timeout: '03'    # 秒
   spec:
     ingressClassName: nginx
     rules:
@@ -1315,8 +1505,12 @@ spec:
 ```
 
 ```shell
-# kubesphere 相关镜像地址为 ${local_registry}/kubesphere/*
+# kubesphere 相关镜像地址为 ${repository}/kubesphere/*
 ```
+
+------
+
+### Error
 
 - ###### node_exportes: 9100 address already in use
 

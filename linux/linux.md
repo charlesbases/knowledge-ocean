@@ -620,8 +620,13 @@ ps aux | grep "./script.sh"
 ## resolv
 
 ```shell
+# 查看 resolv.conf 创建者
+
 # 查看软链接
 ls -l /etc/resolv.conf
+
+# 或查看 resolv.conf 注释
+cat /etc/resolv.conf
 ```
 
 - ##### systemd-resolved
@@ -630,8 +635,30 @@ ls -l /etc/resolv.conf
   sudo sh -c '''
   systemctl disable --now systemd-resolved.service
   rm -rf /etc/resolv.conf
-  echo "nameserver 10.0.14.14" > /etc/resolv.conf
+  echo "nameserver 192.168.1.1" > /etc/resolv.conf
   '''
+  ```
+  
+- ##### NetworkManager
+
+  ```shell
+  # 清理 NetworkManager.conf
+  grep -ir "\[main\]" /etc/NetworkManager
+  ...
+  - [main]
+  ...
+  
+  # 修改配置
+  sudo sh -c """cat > /etc/NetworkManager/conf.d/no-dns.conf << EOF
+  [main]
+  dns=none
+  EOF
+  
+  systemctl restart NetworkManager.service
+  
+  rm -rf /etc/resolv.conf
+  echo "nameserver 192.168.1.1" > /etc/resolv.conf
+  """
   ```
 
 ------
@@ -868,7 +895,7 @@ cat >> /etc/docker/daemon.json << EOF
   "exec-opts": [
     "native.cgroupdriver=systemd"
   ],
-  "registry-mirrors": [
+  "repository-mirrors": [
     "http://docker.mirrors.ustc.edu.cn"
   ],
   "log-driver": "json-file",
@@ -1025,11 +1052,11 @@ vim .cargo/config.toml
   git-fetch-with-cli = true
 
 [source.crates-io]
-  registry = "https://github.com/rust-lang/crates.io-index"
+  repository = "https://github.com/rust-lang/crates.io-index"
   replace-with = 'tuna'
 
 [source.tuna]
-  registry = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
+  repository = "https://mirrors.tuna.tsinghua.edu.cn/git/crates.io-index.git"
 ···
 
 # 清除缓存
@@ -1401,4 +1428,3 @@ for srv in "${services[@]}"; do
 done
 
 ```
-

@@ -44,7 +44,7 @@ sudo vim /etc/docker/daemon.json
   "exec-opts": [
     "native.cgroupdriver=systemd"
   ],
-  "registry-mirrors": [
+  "repository-mirrors": [
     "http://docker.mirrors.ustc.edu.cn"
   ],
   "log-driver": "json-file",
@@ -185,11 +185,11 @@ sudo vim /etc/docker/daemon.json
 
 ------
 
-## 4.  registry
+## 4.  repository
 
 ```shell
 # 镜像拉取
-docker pull registry
+docker pull repository
 
 # 配置私有仓库地址
 vim /etc/docker/daemon.json
@@ -203,7 +203,7 @@ vim /etc/docker/daemon.json
 systemctl restart docker
 
 # 创建容器
-docker run -d -p 5000:5000 --name registry docker.io/registry
+docker run -d -p 5000:5000 --name repository docker.io/repository
 ```
 
 ## 5. proxy
@@ -239,4 +239,3 @@ docker system prune --all
 # latest 镜像版本
 docker image inspect (image):latest | grep -i version
 ```
-
