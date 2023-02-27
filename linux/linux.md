@@ -560,6 +560,26 @@ free -m
   # -s 字符串替换 's/old/new/g'
   ```
 
+  ```shell
+  # 在每一行后面追加一行 "New Line"
+  sed -i 'a New Line' file.txt
+  # 注: 追加内容时, 'a New Line' 不管 'a' 后面的 ' ' 多少, 'New Line' 都会从下一行第一个字符开始。
+  #     若要在行开头添加 ' ', 使用 'a\ New Line'.
+  
+  # 在匹配行后面追加一行 "New Line"
+  sed -i '/^nginx/a New Line' file.txt
+  
+  # 在匹配行前面追加一行 "New Line"
+  sed -i '/^nginx/i New Line' file.txt
+  
+  # 在第 10 行追加 new.txt 文件内容
+  sed -i '20r new.txt' file.txt
+   
+  # a 在匹配行后面追加一行
+  # i 在匹配行前面插入一行
+  # r 在匹配行后面追加文件内容
+  ```
+
 - ##### if
 
   ```shell
