@@ -1415,17 +1415,24 @@ spec:
 
 ## 8. Ingress
 
+![ingress-nginx](.images/ingress-nginx.png)
+
 ```shell
-# wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.5.1/deploy/static/provider/cloud/deploy.yaml nginx-ingress.yaml
+# version=v1.6.4 && wget -O ingress-nginx.yaml https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$version/deploy/static/provider/cloud/deploy.yaml
 
 # 镜像搬运
-# grep -E ' *image:' nginx-ingress.yaml | sed 's/ *image: //' | sort | uniq
+# grep -E ' *image:' ingress-nginx.yaml | sed 's/ *image: //' | sort | uniq
 
 # 修改 Service 代理方式
-sed -i -s 's/  type: LoadBalancer/  type: ClusterIP/' nginx-ingress.yaml
+sed -i -s 's/LoadBalancer/ClusterIP/' ingress-nginx.yaml
+
+# 修改资源限制
+sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
 
 # 暴露 80/443 端口
-···
+sed -i '/^      dnsPolicy: ClusterFirst/a\      hostNetwork: true' ingress-nginx.yaml
+
+...
 apiVersion: apps/v1
 kind: Deployment
 spec:
@@ -1435,11 +1442,10 @@ spec:
         kubernetes.io/hostname="k8s-master"
       # 使用本机网络
       hostNetwork: true
-    containers:
-    - ...
-···
+      containers:
+...
 
-# kubectl apply -f deploy.yaml
+# kubectl apply -f ingress-nginx.yaml
 ```
 
 - ##### ConfigMap
@@ -1454,8 +1460,8 @@ spec:
   data:
     ...
   metadata:
-    name: nginx-ingress-controller
-    namespace: nginx-ingress
+    name: ingress-nginx-controller
+    namespace: ingress-nginx
   ```
 
 - ##### Annotations
