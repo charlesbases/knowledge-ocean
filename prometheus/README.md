@@ -41,7 +41,7 @@ chmod +x bash.sh
 ```shell
 #!/usr/bin/env bash
 
-registry="10.64.21.107:83"
+repository="10.64.21.107:83"
 
 # 统计镜像
 collecting() {
@@ -59,26 +59,26 @@ collecting() {
 
 # 镜像推送
 push() {
-  cat image.txt | while read line; do
-    docker push $registry/$line
+  cat "images.txt" | while read image; do
+    docker push $repository/$image
   done
 }
 
 # 镜像打包
 save() {
-  if [[ ! -e images ]]; then
+  if [[ ! -d images ]]; then
     mkdir images
   fi
 
-  cat image.txt | while read line; do
-    if [[ $registry ]]; then
-      line=$registry/$line
+  cat "images.txt" | while read image; do
+    if [[ $repository ]]; then
+      image=$repository/$image
     fi
 
-    filename=${line##*/}
+    filename=${image##*/}
     filename=${filename//:/_}
 
-    docker save -o ./images/$filename.tar $line
+    docker save -o ./images/$filename.tar $image
   done
 }
 
@@ -125,6 +125,7 @@ apply() {
   done
 }
 
+#  删除本地镜像
 delete() {
   # prometheus
   ls | grep -v "setup" | while read dir; do
@@ -134,23 +135,24 @@ delete() {
   done
 }
 
+# 
 main() {
   collecting .
 
   # 镜像去重
-  cat image.bak | sort | uniq > image.txt && rm -f image.bak
+  cat image.bak | sort | uniq > images.txt && rm -f image.bak
 
   # 镜像下载
-  cat image.txt | while read line; do
-    docker pull $line
-    if [[ $registry ]]; then
-      docker tag $line $registry/$line
+  cat images.txt | while read image; do
+    docker pull $image
+    if [[ $repository ]]; then
+      docker tag $image $repository/$image
     fi
   done
 
   echo
-  if [[ $registry ]]; then
-    echo -e "\033[36mComplete! Please replace the mirror registry to '$registry'.\033[0m\c"
+  if [[ $repository ]]; then
+    echo -e "\033[36mComplete! Please replace the mirror repository to '$repository'.\033[0m\c"
   else
     echo -e "\033[36mComplete!.\033[0m\c"
   fi
@@ -490,3 +492,72 @@ kubectl edit cm -n kubesphere-system kubesphere-config
 ...
 ```
 
+------
+
+## 3. Monitor
+
+### 3.1 kube-apiserver
+
+### 3.2 kube-scheduler
+
+### 3.3 kube-controller-manager
+
+### 3.4 calico
+
+```shell
+# 修改 felix 配置
+kubectl edit felixconfigurations
+
+...
+spec:
+  prometheusMetricsEnabled: true
+...
+
+# 开放 daemonset/calico-node 端口
+kubectl get -n kube-system daemonsets calico-node -o yaml | sed '/^        name: calico-node/a\        ports:\n        - name: http-metrics\n          hostPort: 9091\n          containerPort: 9091' | kubectl apply
+
+...
+spec:
+  template:
+    spec:
+      containers:
+      - name: calico-node
+        ports:
+        - name: http-metrics
+          hostPort: 9091  
+          containerPort: 9091                 
+...
+```
+
+```yaml
+# calico-podMonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    k8s-app: calico-node
+  name: calico
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  podMetricsEndpoints:
+  - interval: 15s
+    path: /metrics
+    port: http-metrics
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+```
+
+### 3.5 ingress
+
+```shell
+```
+
+
+
+------
+
+## 4. Exporter
