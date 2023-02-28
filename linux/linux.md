@@ -567,10 +567,15 @@ free -m
   #     若要在行开头添加 ' ', 使用 'a\ New Line'.
   
   # 在匹配行后面追加一行 "New Line"
-  sed -i '/^nginx/a New Line' file.txt
+  sed -i '/nginx/a New Line' file.txt
+  
+  # (正则)在匹配行后面追加一行 "  New Line"
+  sed -i "/^[[:space:]]nginx/a\  New Line" file.txt
+  ## [[:space:]]  表示匹配空格
+  ## [[:space:]]* 表示匹配任意空格
   
   # 在匹配行前面追加一行 "New Line"
-  sed -i '/^nginx/i New Line' file.txt
+  sed -i '/nginx/i New Line' file.txt
   
   # 在第 10 行追加 new.txt 文件内容
   sed -i '20r new.txt' file.txt
