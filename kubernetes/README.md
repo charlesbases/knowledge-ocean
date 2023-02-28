@@ -585,88 +585,98 @@ spec:
         app: "true"
       # containers: 容器配置
       containers:
-        - name: nginx
-          image: nginx:latest
-          # imagePullPolicy: 镜像拉取策略
-          #   IfNotPresent: 默认值。镜像在宿主机上不存在时才拉取。
-          #   Always: 每次创建 Pod 都会重新拉取一次镜像。
-          #   Never: Pod 永远不会主动拉取镜像。
-          imagePullPolicy: IfNotPresent
-          # ports: 端口
-          ports:
-            - containerPort: 80
-              name: http
-          # volumeMounts: 数据卷挂载
-          volumeMounts:
-            # name: volumes.name
-            - name: localtime
-              # 容器内路径
-              mountPath: /etc/localtime
-            - name: config
-              mountPath: /etc/nginx/conf.d/
-            - name: logs
-              mountPath: /var/log/nginx/
-          # resources: 资源限制
-          resources:
-            # limits: 最大资源限制
-            # 注: limits 设置过大时，k8s 会预留资源，导致资源不能被其他 Pod 有效利用
-            limits:
-              cpu: 500m
-              memory: 512Mi
-            # requests: 最小资源限制
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          # Probe: 探针
-          #
-          # 支持三种检查方式
-          #   exec: 执行 exec 命令，返回状态码是 0 为成功
-          #   httpGet: 发送 HTTP 请求，返回 200-400 范围状态码为成功
-          #   tcpSocket: 发起 TCP Socket 建立成功
-          #
-          # 探针类型
-          #   startProbe:
-          #   readinessProbe: 就绪检查。如果检查失败，会把 Pod 从 service endpoints 中剔除
-          #   livenessProbe: 如果检查失败，将杀死容器，根据 Pod 的 restartPolicy 来操作
-          readinessProbe:
-            exec:
-              command:
-                - cat
-                - /tmp/healthy
-            # initialDelaySeconds: Pod 启动后，延迟多少秒开始探测
-            initialDelaySeconds: 3
-            # periodSeconds: 探针的探测周期
-            periodSeconds: 3
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-            initialDelaySeconds: 3
-            periodSeconds: 3
+      - name: nginx
+        image: nginx:latest
+        # imagePullPolicy: 镜像拉取策略
+        #   IfNotPresent: 默认值。镜像在宿主机上不存在时才拉取。
+        #   Always: 每次创建 Pod 都会重新拉取一次镜像。
+        #   Never: Pod 永远不会主动拉取镜像。
+        imagePullPolicy: IfNotPresent
+        # ports: 端口
+        ports:
+        - name: http
+          # hostPort: 80
+          #   hostPort 与 hostNetwork 异同点
+          #   相同点:
+          #     本质上都是暴露 Pod 所在节点 IP 给终端用户。此外宿主机端口占用也导致不能在同一节点上部署多个程序使用同一端口，
+          #     因此一般情况下不建议使用 hostPort 方式。
+          #   不同点：
+          #     hostNetwork: Pod 实际上使用的是所在节点的网络地址空间，即 Pod IP 是宿主机 IP，而非 CNI 分配的 Pod IP，端口是宿主机网络监听端口
+          #     hostPort: Pod IP 并非宿主机 IP，而是 CNI 分配的 Pod IP，和普通的 Pod 使用一样的 IP 分配方式，端口并非宿主机网络监听端口，
+          #       只是使用了 DNAT 机制将 hostPort 指定端口映射到了容器的端口之上(可通过 iptables 查看)。外部访问此 Pod时，
+          #       仍然使用宿主机和 hostPort 方式
+          containerPort: 80
+        # volumeMounts: 数据卷挂载
+        volumeMounts:
+        # name: volumes.name
+        - name: localtime
+          # 容器内路径
+          mountPath: /etc/localtime
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+        - name: logs
+          mountPath: /var/log/nginx/
+        # resources: 资源限制
+        resources:
+          # limits: 最大资源限制
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          # requests: 最小资源限制
+          ## requests 设置过大时，k8s 会预留资源，导致资源不能被其他 Pod 有效利用
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        # Probe: 探针
+        #
+        # 支持三种检查方式
+        #   exec: 执行 exec 命令，返回状态码是 0 为成功
+        #   httpGet: 发送 HTTP 请求，返回 200-400 范围状态码为成功
+        #   tcpSocket: 发起 TCP Socket 建立成功
+        #
+        # 探针类型
+        #   startProbe:
+        #   readinessProbe: 就绪检查。如果检查失败，会把 Pod 从 service endpoints 中剔除
+        #   livenessProbe: 如果检查失败，将杀死容器，根据 Pod 的 restartPolicy 来操作
+        readinessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          # initialDelaySeconds: Pod 启动后，延迟多少秒开始探测
+          initialDelaySeconds: 3
+          # periodSeconds: 探针的探测周期
+          periodSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 3
       # volumes: 数据卷
       volumes:
-        # hostPath
-        - name: localtime
-          hostPath:
-            path: /etc/localtime
-            # type: hostPath 属性
-            #   "": 默认配置。不进行检查
-            #   File: 预先存在的文件
-            #   Directory: 预先存在的路径
-            #   FileOrCreate: 文件不存在则创建(0644)。所有权属 kubelet
-            #   DirectoryOrCreate: 文件夹不存在则创建(0755)。所有权属 kubelet
-            type: ""
-        # configMap
-        - name: config
-          configMap:
-            name: nginx.conf
-        # persistentVolumeClaim
-        - name: logs
-          persistentVolumeClaim:
-            claimName: nginx-pvc
-        # persistentVolumeClaim
-        - name: logs2
-          persistentVolumeClaim:
+      # hostPath
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+          # type: hostPath 属性
+          #   "": 默认配置。不进行检查
+          #   File: 预先存在的文件
+          #   Directory: 预先存在的路径
+          #   FileOrCreate: 文件不存在则创建(0644)。所有权属 kubelet
+          #   DirectoryOrCreate: 文件夹不存在则创建(0755)。所有权属 kubelet
+          type: ""
+      # configMap
+      - name: config
+        configMap:
+          name: nginx.conf
+      # persistentVolumeClaim
+      - name: logs
+        persistentVolumeClaim:
+          claimName: nginx-pvc
+      # persistentVolumeClaim
+      - name: logs2
+        persistentVolumeClaim:
 
 ```
 
@@ -900,48 +910,50 @@ spec:
       nodeSelector:
         app: "true"
       containers:
-        - name: mysql
-          image: mysql:8.0.28
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 3306
-              hostPort: 3306
-          args:
-            - --character-set-server=utf8mb4
-            - --collation-server=utf8mb4_general_ci
-          env:
-            - name: TZ
-              value: "Asia/Shanghai"
-            - name: MYSQL_ROOT_PASSWORD
-              value: "123456"
-          volumeMounts:
-            - name: localtime
-              mountPath: /etc/localtime
-            - name: data
-              mountPath: /var/lib/mysql
-            - name: config
-              mountPath: "/etc/mysql/my.cnf"
-              subPath: my.cnf
-          resources:
-            limits:
-              cpu: 500m
-              memory: 512Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-      volumes:
+      - name: mysql
+        image: mysql:8.0.28
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: tcp
+          hostPort: 3306
+          containerPort: 3306
+        args:
+        - --character-set-server=utf8mb4
+        - --collation-server=utf8mb4_general_ci
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        volumeMounts:
         - name: localtime
-          hostPath:
-            path: /etc/localtime
+          mountPath: /etc/localtime
         - name: data
-          persistentVolumeClaim:
-            claimName: mysql-pvc
+          mountPath: /var/lib/mysql
         - name: config
-          configMap:
-            name: mysql-config
-            items:
-              - key: my.cnf
-                path: my.cnf
+          mountPath: "/etc/mysql/my.cnf"
+          subPath: my.cnf
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      - name: data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: config
+        configMap:
+          name: mysql-config
+          items:
+          - key: my.cnf
+            path: my.cnf
+
 ```
 
 ### 7. StorageClass
@@ -1422,13 +1434,13 @@ spec:
 
 # 镜像搬运
 # grep -E ' *image:' ingress-nginx.yaml | sed 's/ *image: //' | sort | uniq
+```
 
+```shell
 # 修改 Service 代理方式
 sed -i -s 's/LoadBalancer/ClusterIP/' ingress-nginx.yaml
 
-# 暴露 80/443 端口(host 网络)
-# 注意: 因使用 host 网路，nginx 重启时会因端口占用而处于 Pending 状态，需要修改更新策略为 Recreate
-sed -i '/dnsPolicy: ClusterFirst/a\      hostNetwork: true' ingress-nginx.yaml
+# 因使用 hostPort 网络，nginx 重启时会因端口占用而处于 Pending 状态，需要修改更新策略为 Recreate
 sed -i '/minReadySeconds:/i\  strategy:\n    type: Recreate' ingress-nginx.yaml
 
 ...
@@ -1437,13 +1449,6 @@ kind: Deployment
 spec:
   strategy:
     type: Recreate
-  template:
-    spec:
-      nodeSelector:
-        kubernetes.io/hostname="k8s-master"
-      # 使用本机网络
-      hostNetwork: true
-      containers:
 ...
 ```
 
@@ -1455,7 +1460,7 @@ sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
 sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.yaml
 ```
 
-
+------
 
 - ##### ConfigMap
 
@@ -1787,6 +1792,7 @@ kubectl get endpoints <svc>
 kubectl get configmaps -n kube-system kube-proxy -o yaml | grep mode
 
 # 使用 ipvs 模式
+## mode: "" => mode: "ipvs"
 kubectl edit -n kube-system configmaps kube-proxy
 
 # 重启 kube-proxy
