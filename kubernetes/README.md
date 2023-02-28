@@ -1426,16 +1426,17 @@ spec:
 # 修改 Service 代理方式
 sed -i -s 's/LoadBalancer/ClusterIP/' ingress-nginx.yaml
 
-# 修改资源限制
-sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
-
-# 暴露 80/443 端口
-sed -i '/^      dnsPolicy: ClusterFirst/a\      hostNetwork: true' ingress-nginx.yaml
+# 暴露 80/443 端口(host 网络)
+# 注意: 因使用 host 网路，nginx 重启时会因端口占用而处于 Pending 状态，需要修改更新策略为 Recreate
+sed -i '/dnsPolicy: ClusterFirst/a\      hostNetwork: true' ingress-nginx.yaml
+sed -i '/minReadySeconds:/i\  strategy:\n    type: Recreate' ingress-nginx.yaml
 
 ...
 apiVersion: apps/v1
 kind: Deployment
 spec:
+  strategy:
+    type: Recreate
   template:
     spec:
       nodeSelector:
@@ -1444,9 +1445,17 @@ spec:
       hostNetwork: true
       containers:
 ...
-
-# kubectl apply -f ingress-nginx.yaml
 ```
+
+```shell
+# 修改资源限制
+sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
+
+# enabling metrics
+sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.yaml
+```
+
+
 
 - ##### ConfigMap
 

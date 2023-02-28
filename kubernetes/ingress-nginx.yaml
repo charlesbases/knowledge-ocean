@@ -400,6 +400,8 @@ metadata:
   name: ingress-nginx-controller
   namespace: ingress-nginx
 spec:
+  strategy:
+    type: Recreate
   minReadySeconds: 0
   revisionHistoryLimit: 10
   selector:
@@ -417,6 +419,7 @@ spec:
       containers:
       - args:
         - /nginx-ingress-controller
+        - --enable-metrics
         - --publish-service=$(POD_NAMESPACE)/ingress-nginx-controller
         - --election-id=ingress-nginx-leader
         - --controller-class=k8s.io/ingress-nginx
