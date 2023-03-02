@@ -281,6 +281,35 @@ spec:
               number: 9090
 ```
 
+##### 4. (rabc) prometheus-clusterRole.yaml
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-k8s
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - endpoints
+  - nodes
+  - nodes/proxy
+  - nodes/metrics
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+```
+
+
+
 ------
 
 #### 2.3.2 部署清单
@@ -351,6 +380,26 @@ watchdog 是一个正常的报警，这个告警的作用是：如果 alermanger
   file=/etc/kubernetes/manifests/kube-scheduler.yaml
   sudo sh -c "sed -s -i 's/--bind-address=127.0.0.1/--bind-address=0.0.0.0/g' $file"
   ```
+
+##### 3. (err) 403
+
+- ##### kubelet
+
+##### others
+
+- ##### serviceMonitor 绑定不了 service
+
+  ```shell
+  # serviceMonitor 可绑定任意 namespace 下匹配 labels 的 service，如需指定 namespace，可通过 namespaceSelector 配置
+  
+  ...
+    namespaceSelector:
+      matchNames:
+      - my-namespace
+  ....
+  ```
+
+  
 
 ------
 
@@ -496,13 +545,15 @@ kubectl edit cm -n kubesphere-system kubesphere-config
 
 ## 3. Monitor
 
-### 3.1 kube-apiserver
+### 3.1 kubelet
 
-### 3.2 kube-scheduler
+### 3.2 kube-apiserver
 
-### 3.3 kube-controller-manager
+### 3.3 kube-scheduler
 
-### 3.4 calico
+### 3.4 kube-controller-manager
+
+### 3.5 calico
 
 ```shell
 # 修改 felix 配置
@@ -514,7 +565,7 @@ spec:
 ...
 
 # 开放 daemonset/calico-node 端口
-kubectl get -n kube-system daemonsets calico-node -o yaml | sed '/^        name: calico-node/a\        ports:\n        - name: http-metrics\n          hostPort: 9091\n          containerPort: 9091' | kubectl apply
+kubectl get -n kube-system daemonsets calico-node -o yaml | sed '/^        name: calico-node/a\        ports:\n        - name: http-metrics\n          hostPort: 9091\n          containerPort: 9091' | kubectl apply -f -
 
 ...
 spec:
@@ -551,13 +602,69 @@ spec:
       k8s-app: calico-node
 ```
 
-### 3.5 ingress
+### 3.6 ingress
 
 ```shell
+# metrics
+kubectl get -n ingress-nginx deployments ingress-nginx-controller -o yaml | sed '/creationTimestamp/i\    prometheus.io/scrape: "true"\n    prometheus.io/port: "10254"' | sed '/ports:/a\        - name: metrics\n          containerPort: 10254' | kubectl apply -f -
+
+# service
+cat > ingress-nginx-metrics.yaml << EOF
+
+EOF
+
+kubectl get -n ingress-nginx svc ingress-nginx-controller -o yaml | sed '/creationTimestamp/i\    prometheus.io/scrape: "true"\n    prometheus.io/port: "10254"' | sed '/ports:/a\  - name: metrics\n    port: 10254\n    targetPort: metrics' | kubectl apply -f -
 ```
 
+```shell
+# 日志查看
+kubectl logs -n ingress-nginx $(kubectl get -n ingress-nginx pods | grep ingress-nginx-controller | awk '{print $1}')
 
+# 查看标签
+kubectl get -n ingress-nginx svc ingress-nginx-controller -o yaml
+```
+
+```yaml
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: ingress-nginx-metrics
+  namespace: ingress-nginx
+  labels:
+    k8s-app: ingress-nginx
+spec:
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 10254
+      targetPort: metrics
+  selector:
+    app.kubernetes.io/component: controller
+  type: ClusterIP
+  
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+  name: ingress-nginx
+  namespace: monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    path: /metrics
+  namespaceSelector:
+    matchNames:
+    - ingress-nginx
+  selector:
+    matchLabels:
+      k8s-app: ingress-nginx
+```
 
 ------
 
 ## 4. Exporter
+
