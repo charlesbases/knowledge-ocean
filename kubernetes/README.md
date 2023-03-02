@@ -605,6 +605,7 @@ spec:
           #     hostPort: Pod IP 并非宿主机 IP，而是 CNI 分配的 Pod IP，和普通的 Pod 使用一样的 IP 分配方式，端口并非宿主机网络监听端口，
           #       只是使用了 DNAT 机制将 hostPort 指定端口映射到了容器的端口之上(可通过 iptables 查看)。外部访问此 Pod时，
           #       仍然使用宿主机和 hostPort 方式
+          #     另，hostNetwork 在 Pod 中是全局的，当前 Pod 上所有端口都会使用宿主机的网络地址空间；hostPort 可指定 port 使用宿主机端口映射
           containerPort: 80
         # volumeMounts: 数据卷挂载
         volumeMounts:
@@ -1202,7 +1203,113 @@ spec:
 
 ------
 
-## 5. [helm](https://helm.sh/zh/docs/)
+## 5. rabc
+
+```txt
+rabc:
+  是 Kubernetes 集群基于角色的访问控制，实现授权决策，允许通过 Kubernetes API 动态配置策略。
+  
+ClusterRole:
+  是一组权限的集合，但与Role不同的是，ClusterRole可以在包括所有NameSpce和集群级别的资源或非资源类型进行鉴权。
+```
+
+### apiGroups
+
+```shell
+# ""
+# "apps"
+# "batch"
+# "autoscaling"
+```
+
+### resources
+
+```shell
+# "services"
+# "endpoints"
+# "pods"
+# "secrets"
+# "configmaps"
+# "crontabs"
+# "deployments"
+# "jobs"
+# "nodes"
+# "rolebindings"
+# "clusterroles"
+# "daemonsets"
+# "replicasets"
+# "statefulsets"
+# "horizontalpodautoscalers"
+# "replicationcontrollers"
+# "cronjobs"
+```
+
+### verbs
+
+```shell
+# "get"
+# "list"
+# "watch"
+# "create"
+# "update"
+# "patch"
+# "delete"
+# "exec"
+```
+
+------
+
+```yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/component: prometheus
+  name: prometheus-k8s
+  namespace: monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-k8s
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  - endpoints
+  - nodes
+  - nodes/proxy
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: prometheus
+  name: prometheus-k8s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: monitoring
+```
+
+## 6. [helm](https://helm.sh/zh/docs/)
 
 ```shell
 1. helm: 命令行工具
@@ -1266,7 +1373,7 @@ spec:
 
 ------
 
-## 6. secret
+## 7. secret
 
 - ##### kubernetes.io/tls
 
@@ -1326,7 +1433,7 @@ spec:
 
 ------
 
-## 7. volumes
+## 8. volumes
 
 ### 1. hostPath
 
@@ -1425,9 +1532,21 @@ spec:
 
 ------
 
-## 8. Ingress
+## 9. Ingress
 
 ![ingress-nginx](.images/ingress-nginx.png)
+
+```txt
+目前常用的 ingress-nginx 有俩个。一个是 kubernetes 官方开源的 ingress-nginx，一个是 nginx 官方开源的 ingress-nginx。区别如下
+  1. kubernetes 官方的 Controller 是采用 Go 语言开发的，集成了 Lua 实现的 OpenResty；而 nginx 官方的 Controller 是集成 nginx
+  2. 俩者的 nginx 配置不同，并且俩者使用的 nginx.conf 配置模板也是不一样的。
+     nginx 官方采用的俩个模板文件以 include 的方式配置 upstream；
+     kubernetes 官方版本采用 Lua 动态配置 upstream，所以不需要 reload
+所以，在 Pod 频繁变更的场景下，采用 kubernetes 官方版本不需要 reload，影响更小
+
+# kubernetes ingress-nginx
+https://github.com/kubernetes/ingress-nginx
+```
 
 ```shell
 # version=v1.6.4 && wget -O ingress-nginx.yaml https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-$version/deploy/static/provider/cloud/deploy.yaml
@@ -1436,28 +1555,46 @@ spec:
 # grep -E ' *image:' ingress-nginx.yaml | sed 's/ *image: //' | sort | uniq
 ```
 
-```shell
-# 修改 Service 代理方式
-sed -i -s 's/LoadBalancer/ClusterIP/' ingress-nginx.yaml
+- ##### internal network
 
-# 因使用 hostPort 网络，nginx 重启时会因端口占用而处于 Pending 状态，需要修改更新策略为 Recreate
-sed -i '/minReadySeconds:/i\  strategy:\n    type: Recreate' ingress-nginx.yaml
+  ```txt
+  在内部网络中，请求先经过 ingress-nginx(pod)，通过 nginx.conf 转发到相应的业务 service，再通过 service 请求 pod. (ingress-nginx(svc) 不参与请求处理)
+  
+  request => ingress-nginx(pod) => service => pod
+  ```
 
-...
-apiVersion: apps/v1
-kind: Deployment
-spec:
-  strategy:
-    type: Recreate
-...
-```
+  ```shell
+  # 需暴露 ingress-nginx-controller 端口，并修改 service 代理方式、修改更新策略为 Recreate。
+  if [[ ! $(cat ingress-nginx.yaml | grep "hostPort: 80") ]]; then sed -i '/containerPort: 80/a\          hostPort: 80' ingress-nginx.yaml; fi
+  
+  if [[ ! $(cat ingress-nginx.yaml | grep "hostPort: 443") ]]; then sed -i '/containerPort: 443/a\          hostPort: 443' ingress-nginx.yaml; fi
+  
+  # 修改 Service 代理方式
+  sed -i -s 's/LoadBalancer/ClusterIP/' ingress-nginx.yaml
+  
+  # 因使用 hostPort 网络，nginx 重启时会因端口占用而处于 Pending 状态，需要修改更新策略为 Recreate
+  sed -i '/minReadySeconds:/i\  strategy:\n    type: Recreate' ingress-nginx.yaml
+  
+  ...
+  apiVersion: apps/v1
+  kind: Deployment
+  spec:
+    strategy:
+      type: Recreate
+  ...
+  ```
+
+- ##### external network
+
+  ```txt
+  在外部网络中，用户通过外网域名，先经过第三方 DNS 服务器，将请求转发给 ingress-nginx(svc)，ingress-nginx(svc) 将请求分发给 ingress-nginx(pod)，再通过 nginx.conf 转发给业务 service，service 再请求 pod
+  
+  request => 第三方 DNS 服务器 => ingress-nginx(svc) => ingress-nginx(pod) => service => pod
+  ```
 
 ```shell
 # 修改资源限制
 sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
-
-# enabling metrics
-sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.yaml
 ```
 
 ------
@@ -1514,7 +1651,7 @@ sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.ya
 
 ------
 
-## 9. KubeSphere
+## 10. KubeSphere
 
 ```shell
 # 最小化安装
@@ -1546,7 +1683,7 @@ sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.ya
   kubectl edit -n kubesphere-monitoring-system svc node-exporter
   ```
 
-## 10. kubectl-command
+## 11. kubectl-command
 
 ------
 
@@ -1688,7 +1825,7 @@ sed -i '/nginx-ingress-controller/a\        - --enable-metrics' ingress-nginx.ya
 
 --------
 
-## 11. scripts
+## 12. scripts
 
 ### 1. super kubectl
 
@@ -1740,7 +1877,7 @@ source $HOME/.zshrc
 
 --------
 
-## 12. 问题排查
+## 13. 问题排查
 
 ```shell
 # 查看 kubelet 日志
