@@ -235,6 +235,15 @@ source ~/.zshrc
 ## vim
 
 ```shell
+# 快捷键
+
+# G:  跳至文本最后一行
+# gg: 跳至文本首行
+# $:  跳至当前行最后一个字符
+# 0:  跳至当前行首字符
+```
+
+```shell
 vim ～/.vimrc
 
 ···
@@ -594,6 +603,9 @@ free -m
   else
     echo "a is not null"
   fi
+  
+  # -z 是否为空字符串
+  # -n 是否不为空
   ```
 
   ```shell
@@ -638,6 +650,23 @@ nohup ./script.sh > /opt/log/output.log 2>&1 &
 
 # PID
 ps aux | grep "./script.sh"
+```
+
+------
+
+## rsync
+
+```shell
+# 本地同步
+rsync -a source destination
+
+# 远程同步
+rsync -a source user@remote:destination
+
+# -a 递归；保存文件信息，包括时间、权限等
+# -r 递归
+# -z 传输时使用数据传输
+# --delete 从 'destination' 删除 'source' 中不存在的文件 
 ```
 
 ------

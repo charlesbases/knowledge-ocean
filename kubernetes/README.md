@@ -1203,10 +1203,10 @@ spec:
 
 ------
 
-## 5. rabc
+## 5. rbac
 
 ```txt
-rabc:
+rbac:
   是 Kubernetes 集群基于角色的访问控制，实现授权决策，允许通过 Kubernetes API 动态配置策略。
   
 ClusterRole:
@@ -1757,17 +1757,18 @@ sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
 
 ### 2. 常用命令
 
-  | 命令    | 说明                                           | 示例                                                         |
-  | ------- | ---------------------------------------------- | ------------------------------------------------------------ |
-  | apply   | 通过文件名或标准输入，配置资源                 | kubectl apply -f app.yaml                                    |
-  | create  | 通过文件名或者标准输入创建资源                 | kubectl create deployment app --image=nginx:alpine -o yaml --dry-run=client > app.yaml |
-  | delete  | 通过文件名、标准输入、资源名称或标签来删除资源 | kubectl delete -f app.yaml                                   |
-  | edit    | 使用默认的编辑器编辑资源                       |                                                              |
-  | expose  | 将一个资源公开为一个新的 Service。             | kubectl expose deployment app --port=8080 --type=NodePort --target-port=8080 --name=app -o yaml > app.service.yaml |
-  | explain | 文档参考资料                                   | kubectl explain Deployment.apiVersion                        |
-  | get     | 显示一个或多个资源                             | kubectl get pods,svc                                         |
-  | run     | 在集群中运行一个特定的镜像                     | kubectl run --image nginx:latest                             |
-  | set     | 在对象上设置特定的功能                         | kubectl set image deployment app nginx=nginx:latest (镜像版本升级) |
+| 命令    | 说明                                           | 示例                                                         |
+| ------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| apply   | 通过文件名或标准输入，配置资源                 | kubectl apply -f app.yaml                                    |
+| create  | 通过文件名或者标准输入创建资源                 | kubectl create deployment app --image=nginx:alpine -o yaml --dry-run=client > app.yaml |
+| delete  | 通过文件名、标准输入、资源名称或标签来删除资源 | kubectl delete -f app.yaml                                   |
+| edit    | 使用默认的编辑器编辑资源                       |                                                              |
+| expose  | 将一个资源公开为一个新的 Service。             | kubectl expose deployment app --port=8080 --type=NodePort --target-port=8080 --name=app -o yaml > app.service.yaml |
+| explain | 文档参考资料                                   | kubectl explain Deployment.apiVersion                        |
+| get     | 显示一个或多个资源                             | kubectl get pods,svc                                         |
+| run     | 在集群中运行一个特定的镜像                     | kubectl run --image nginx:latest                             |
+| set     | 在对象上设置特定的功能                         | kubectl set image deployment app nginx=nginx:latest (镜像版本升级) |
+| exec    | 在容器内执行命令                               | kubectl exec nginx --bash -c "echo" (执行命令)<br />kubectl exec nginx -it -- bash      (进入容器) |
 
 ------
 
