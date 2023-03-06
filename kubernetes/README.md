@@ -435,21 +435,22 @@ sudo systemctl restart kubelet
 - ##### 接口删除
 
   ```shell
-  name=target
-  kubectl get ns $name -o json > $name.json
+  namespace=target
+  kubectl get ns $namespace -o json > $name.json
   
   # 删除 spec 与 status
-  vim $name.json
+  vim $namespace.json
   ...
   
   # 启动代理(需使用 nohup 后台运行，或者开启另一个 session)
   kubectl proxy
   
   # 调用接口删除 namespace
-  curl -k -H "Content-Type: application/json" -X PUT --data-binary @$name.json http://localhost:8001/api/v1/namespaces/$name/finalize
+  curl -k -H "Content-Type: application/json" -X PUT --data-binary @$namespace.json http://localhost:8001/api/v1/namespaces/$namespace/finalize
   
   # 关闭代理
-  # kill -9 或 close session
+  # kill -9 $(ps -ux | grep "kubectl proxy" | awk '{if (NR ==1){print $2}}')
+  # 或 close session
   ```
 
 --------
@@ -1651,39 +1652,15 @@ sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
 
 ------
 
-## 10. KubeSphere
-
-```shell
-# 最小化安装
-# https://kubesphere.io/zh/docs/v3.3/quick-start/minimal-kubesphere-on-k8s/
-
-# 离线安装
-# https://kubesphere.io/zh/docs/v3.3/installing-on-kubernetes/on-prem-kubernetes/install-ks-on-linux-airgapped/
-```
-
-```shell
-# kubesphere 相关镜像地址为 ${repository}/kubesphere/*
-```
+## 10. [Prometheus](./prometheus/README.md)
 
 ------
 
-### Error
+## 11. [KubeSphere](./kubesphere/README.md)
 
-- ###### node_exportes: 9100 address already in use
+------
 
-  ```shell
-  # 方法一: 修改 kubesphere-configuration.yaml
-  ···
-      node_exporter:
-        port: 9100
-  ···
-  
-  # 方法二: 修改 Kubernetes 资源
-  kubectl edit -n kubesphere-monitoring-system ds node-exporter
-  kubectl edit -n kubesphere-monitoring-system svc node-exporter
-  ```
-
-## 11. kubectl-command
+## 12. kubectl-command
 
 ------
 
@@ -1826,58 +1803,6 @@ sed -i -s 's/90Mi/128Mi/' ingress-nginx.yaml
 
 --------
 
-## 12. scripts
-
-### 1. super kubectl
-
-```shell
-# kubectl apply ...
-kk -a [folder|files]
-
-# kubectl delete ...
-kk -d [folder|files]
-```
-
-```shell
-cat > $HOME/.super-kuberctl.sh << EOF
-#!/bin/bash
-
-set -e
-
-command="apply"
-
-recursive() {
-  local base=$1
-  if [[ "${base##*.}" = "yaml" ]]; then
-    kubectl $command -f $base
-  elif [[ -d "$base" ]]; then
-    local subs=($(ls $base))
-    for sub in "${subs[@]}"; do
-      recursive $base/$sub
-    done
-  fi
-}
-
-if [[ $1 = "-d" ]]; then
-  command = "delete"
-fi
-
-for arg in $@; do
-  recursive $arg
-done
-EOF
-
-chmod +x $HOME/.kubectl.sh
-
-cat >> $HOME/.zshrc << EOF
-alias kk="$HOME/.super-kuberctl.sh"
-EOF
-
-source $HOME/.zshrc
-```
-
---------
-
 ## 13. 问题排查
 
 ```shell
@@ -1936,3 +1861,57 @@ kubectl edit -n kube-system configmaps kube-proxy
 # 重启 kube-proxy
 kubectl delete -n kube-system pods $(kubectl get pods -n kube-system | grep kube-proxy | awk '{print $1}')
 ```
+
+------
+
+## 99. scripts
+
+- ##### super-kubectl
+
+  ```shell
+  # kubectl apply ...
+  kk -a [folder|files]
+  
+  # kubectl delete ...
+  kk -d [folder|files]
+  ```
+
+  ```shell
+  cat > $HOME/.super-kuberctl.sh << EOF
+  #!/bin/bash
+  
+  set -e
+  
+  command="apply"
+  
+  recursive() {
+    local base=$1
+    if [[ "${base##*.}" = "yaml" ]]; then
+      kubectl $command -f $base
+    elif [[ -d "$base" ]]; then
+      local subs=($(ls $base))
+      for sub in "${subs[@]}"; do
+        recursive $base/$sub
+      done
+    fi
+  }
+  
+  if [[ $1 = "-d" ]]; then
+    command = "delete"
+  fi
+  
+  for arg in $@; do
+    recursive $arg
+  done
+  EOF
+  
+  chmod +x $HOME/.kubectl.sh
+  
+  cat >> $HOME/.zshrc << EOF
+  alias kk="$HOME/.super-kuberctl.sh"
+  EOF
+  
+  source $HOME/.zshrc
+  ```
+
+  
