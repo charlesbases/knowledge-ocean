@@ -1,3 +1,9 @@
+[GitHub](https://github.com/kubesphere/kubesphere)
+
+------
+
+------
+
 ## 1. 安装
 
 - ##### minimal
@@ -15,9 +21,17 @@
 ------
 
 ```shell
-version=v3.3.1
+version=v3.3.2
+
+# yaml
 wget https://github.com/kubesphere/ks-installer/releases/download/$version/kubesphere-installer.yaml
 wget https://github.com/kubesphere/ks-installer/releases/download/$version/cluster-configuration.yaml
+
+# images list
+wget -O images.txt https://github.com/kubesphere/ks-installer/releases/download/$version/images-list.txt
+
+# installation-tool.sh
+wget -O installation.sh https://github.com/kubesphere/ks-installer/releases/download/v3.3.1/offline-installation-tool.sh
 ```
 
 ```shell
